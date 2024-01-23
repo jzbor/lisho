@@ -48,14 +48,14 @@ fn last_modified(file: &str) -> io::Result<SystemTime> {
 fn read_mappings(file: &str) -> io::Result<HashMap<String, String>> {
     let file_contents = fs::read_to_string(file)?;
     let lines = file_contents.lines()
-        .filter(|l| !l.starts_with("#"))
+        .filter(|l| !l.starts_with('#'))
         .filter(|l| !l.is_empty());
     let mut map = HashMap::new();
 
     for line in lines {
         let columns: Vec<_> = line.split_whitespace().collect();
 
-        if line.starts_with(" ") && columns.len() >= 1 {
+        if line.starts_with(' ') && !columns.is_empty() {
             map.insert("".to_owned(), columns[0].to_owned());
         } else if columns.len() >= 2 {
             map.insert(columns[0].to_owned(), columns[1].to_owned());

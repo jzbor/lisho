@@ -29,6 +29,6 @@ fn main() -> io::Result<()> {
 }
 
 fn print_usage() {
-    let bin_name = env::args().nth(0).unwrap();
+    let bin_name = env::args().next().unwrap();
     println!("Usage: {bin_name} <mapping_file> [address]");
 }

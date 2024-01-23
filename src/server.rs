@@ -57,7 +57,7 @@ impl Server {
             .take_while(|line| !line.is_empty())
             .collect();
 
-        let request_tokens: Vec<_> = request_line.split(" ").collect();
+        let request_tokens: Vec<_> = request_line.split(' ').collect();
 
         if request_tokens.len() != 3 {
             Self::send_response(stream, ResponseType::BadRequest, None)
