@@ -1,13 +1,14 @@
-use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 
+use crate::store::Store;
+
 
 pub struct Server {
     listener: TcpListener,
-    link_map: HashMap<String, String>,
+    store: Store
 }
 
 enum ResponseType {
@@ -21,15 +22,25 @@ const HTTP_VERSION: &str = "HTTP/1.1";
 
 
 impl Server {
-    pub fn init(addr: &str, link_map: HashMap<String, String>) -> io::Result<Self> {
+    pub fn init(addr: &str, store: Store) -> io::Result<Self> {
         Ok(Server {
             listener: TcpListener::bind(addr)?,
-            link_map,
+            store,
         })
     }
 
-    pub fn run(&self) -> io::Result<()> {
+    pub fn run(&mut self) -> io::Result<()> {
         for stream in self.listener.incoming() {
+            if let Ok(res) = self.store.has_changed() {
+                if res {
+                    let status = self.store.refresh();
+                    if status.is_ok() {
+                        let nlinks = self.store.len();
+                        println!("Reloading store ({nlinks} links)");
+                    }
+                }
+            }
+
             self.handle_connection(stream?)?;
         }
         Ok(())
@@ -56,7 +67,7 @@ impl Server {
             let path = request_tokens[1];
             let token = &path[1..];
 
-            if let Some(link) = self.link_map.get(token) {
+            if let Some(link) = self.store.get(token) {
                 println!("Token requested: {token}");
                 let content = format!("<meta http-equiv=\"refresh\" content=\"0; url={link}\" />");
                 Self::send_response(stream, ResponseType::Ok, Some(&content))
