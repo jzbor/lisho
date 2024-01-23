@@ -2,3 +2,6 @@
 name = "lisho"
 version = "0.1.0"
 edition = "2021"
+description = "A simple personal link shortener with no external dependencies in under 200 lines of Rust."
+license = "MIT"
+
