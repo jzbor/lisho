@@ -13,6 +13,7 @@ pub struct Server {
 }
 
 enum ResponseType {
+    Ok,
     TemporaryRedirect,
     PermanentRedirect,
     BadRequest,
@@ -24,6 +25,8 @@ const HTTP_VERSION: &str = "HTTP/1.1";
 const LET_CLIENTS_CACHE: bool = true;
 const NOT_FOUND_PAGE: &str = include_str!("404.html");
 const REDIRECTION_PAGE: &str = include_str!("redirect.html");
+const INDEX_PAGE: &str = include_str!("index.html");
+const STYLE_SHEET: &str = include_str!("style.css");
 
 
 impl Server {
@@ -86,8 +89,16 @@ impl Server {
                 let headers = HashMap::from([("Location", link)]);
                 Self::send_response(stream, response_type, headers, Some(&content))
             } else {
-                let content = str::replace(NOT_FOUND_PAGE, "REDIRECTION_TOKEN", token);
-                Self::send_response(stream, ResponseType::NotFound, HashMap::new(), Some(&content))
+                match path {
+                    "/" | "/index.html" =>
+                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(INDEX_PAGE)),
+                    "/style.css" =>
+                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(STYLE_SHEET)),
+                    _ => {
+                        let content = str::replace(NOT_FOUND_PAGE, "REDIRECTION_TOKEN", token);
+                        Self::send_response(stream, ResponseType::NotFound, HashMap::new(), Some(&content))
+                    },
+                }
             }
         }
     }
@@ -97,6 +108,7 @@ impl Server {
         use ResponseType::*;
 
         let code_and_reason = match response_type {
+            Ok => "200 OK",
             TemporaryRedirect => "307 TEMPORARY REDIRECT",
             PermanentRedirect => "307 PERMANENT REDIRECT",
             BadRequest => "400 BAD REQUEST",
