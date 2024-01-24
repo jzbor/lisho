@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -12,13 +13,15 @@ pub struct Server {
 }
 
 enum ResponseType {
-    Ok,
+    TemporaryRedirect,
+    PermanentRedirect,
     BadRequest,
     NotFound,
 }
 
 
 const HTTP_VERSION: &str = "HTTP/1.1";
+const LET_CLIENTS_CACHE: bool = false;
 
 
 impl Server {
@@ -60,28 +63,37 @@ impl Server {
         let request_tokens: Vec<_> = request_line.split(' ').collect();
 
         if request_tokens.len() != 3 {
-            Self::send_response(stream, ResponseType::BadRequest, None)
+            Self::send_response(stream, ResponseType::BadRequest, HashMap::new(), None)
         } else if request_tokens[0] != "GET" {
-            Self::send_response(stream, ResponseType::NotFound, None)
+            Self::send_response(stream, ResponseType::NotFound, HashMap::new(), None)
         } else {
             let path = request_tokens[1];
             let token = &path[1..];
 
             if let Some(link) = self.store.get(token) {
                 println!("Token requested: {token}");
-                let content = format!("<meta http-equiv=\"refresh\" content=\"0; url={link}\" />");
-                Self::send_response(stream, ResponseType::Ok, Some(&content))
+                let content = format!("<!DOCTYPE html><title>{token}</title>\
+                                        <a href=\"{link}\">Click here for instant redirection</a>");
+                let response_type = if LET_CLIENTS_CACHE {
+                    ResponseType::PermanentRedirect
+                } else {
+                    ResponseType::TemporaryRedirect
+                };
+                let headers = HashMap::from([("Location", link)]);
+                Self::send_response(stream, response_type, headers, Some(&content))
             } else {
-                Self::send_response(stream, ResponseType::NotFound, None)
+                Self::send_response(stream, ResponseType::NotFound, HashMap::new(), None)
             }
         }
     }
 
-    fn send_response(mut stream: TcpStream, response_type: ResponseType, content: Option<&str>) -> io::Result<()> {
+    fn send_response(mut stream: TcpStream, response_type: ResponseType,
+                        headers: HashMap<&str, &str>, content: Option<&str>) -> io::Result<()> {
         use ResponseType::*;
 
         let code_and_reason = match response_type {
-            Ok => "200 OK",
+            TemporaryRedirect => "307 TEMPORARY REDIRECT",
+            PermanentRedirect => "307 PERMANENT REDIRECT",
             BadRequest => "400 BAD REQUEST",
             NotFound => "404 NOT FOUND",
         };
@@ -92,8 +104,16 @@ impl Server {
         };
         let length = content.len();
 
+        // Status line
         write!(stream, "{HTTP_VERSION} {code_and_reason}\r\n")?;
+
+        // Headers
+        for (key, value) in &headers {
+            write!(stream, "{key}: {value}\r\n")?;
+        }
         write!(stream, "Content-Length: {length}\r\n\r\n")?;
+
+        // Content
         write!(stream, "{content}")?;
 
         stream.flush()
