@@ -49,7 +49,9 @@ impl Server {
                 }
             }
 
-            self.handle_connection(stream?)?;
+            if let Ok(stream) = stream {
+                let _ = self.handle_connection(stream);
+            }
         }
         Ok(())
     }
