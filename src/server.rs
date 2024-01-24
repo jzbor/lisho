@@ -37,7 +37,7 @@ impl Server {
         })
     }
 
-    pub fn run(&mut self) -> io::Result<()> {
+    pub fn run(&mut self) {
         for stream in self.listener.incoming() {
             if let Ok(res) = self.store.has_changed() {
                 if res {
@@ -53,7 +53,6 @@ impl Server {
                 let _ = self.handle_connection(stream);
             }
         }
-        Ok(())
     }
 
     fn handle_connection(&self, stream: TcpStream) -> io::Result<()> {
