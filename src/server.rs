@@ -21,7 +21,9 @@ enum ResponseType {
 
 
 const HTTP_VERSION: &str = "HTTP/1.1";
-const LET_CLIENTS_CACHE: bool = false;
+const LET_CLIENTS_CACHE: bool = true;
+const NOT_FOUND_PAGE: &str = include_str!("404.html");
+const REDIRECTION_PAGE: &str = include_str!("redirect.html");
 
 
 impl Server {
@@ -62,6 +64,7 @@ impl Server {
 
         let request_tokens: Vec<_> = request_line.split(' ').collect();
 
+
         if request_tokens.len() != 3 {
             Self::send_response(stream, ResponseType::BadRequest, HashMap::new(), None)
         } else if request_tokens[0] != "GET" {
@@ -72,8 +75,9 @@ impl Server {
 
             if let Some(link) = self.store.get(token) {
                 println!("Token requested: {token}");
-                let content = format!("<!DOCTYPE html><title>{token}</title>\
-                                        <a href=\"{link}\">Click here for instant redirection</a>");
+                let content = str::replace(REDIRECTION_PAGE, "REDIRECTION_TOKEN", token);
+                let content = str::replace(&content, "REDIRECTION_LINK", link);
+
                 let response_type = if LET_CLIENTS_CACHE {
                     ResponseType::PermanentRedirect
                 } else {
@@ -82,7 +86,8 @@ impl Server {
                 let headers = HashMap::from([("Location", link)]);
                 Self::send_response(stream, response_type, headers, Some(&content))
             } else {
-                Self::send_response(stream, ResponseType::NotFound, HashMap::new(), None)
+                let content = str::replace(NOT_FOUND_PAGE, "REDIRECTION_TOKEN", token);
+                Self::send_response(stream, ResponseType::NotFound, HashMap::new(), Some(&content))
             }
         }
     }
