@@ -18,10 +18,12 @@ enum ResponseType {
     TemporaryRedirect,
     PermanentRedirect,
     BadRequest,
+    ReqURITooLong,
     NotFound,
 }
 
 
+const MAX_HTTP_REQUEST_LEN: usize = 0;
 const HTTP_VERSION: &str = "HTTP/1.1";
 const LET_CLIENTS_CACHE: bool = true;
 const NOT_FOUND_PAGE: &str = include_str!("404.html");
@@ -58,20 +60,21 @@ impl Server {
         }
     }
 
-    fn handle_connection(&self, stream: TcpStream) -> io::Result<()> {
-        let reader = BufReader::new(&stream);
-        let request_line = match reader.lines().next() {
-            Some(line) => line?,
-            None => return Ok(()),
+    fn handle_connection(&self, mut stream: TcpStream) -> io::Result<()> {
+        let request_line = match Self::read_line_limited(&mut stream, MAX_HTTP_REQUEST_LEN) {
+            Ok(line) => line,
+            Err(opt) => match opt {
+                Some(err) => return Err(err),
+                None => return Ok(()),
+            },
         };
-
         let request_tokens: Vec<_> = request_line.split(' ').collect();
 
 
         if request_tokens.len() != 3 {
-            Self::send_response(stream, ResponseType::BadRequest, HashMap::new(), None)
+            Self::send_response(&mut stream, ResponseType::BadRequest, HashMap::new(), None)
         } else if request_tokens[0] != "GET" {
-            Self::send_response(stream, ResponseType::NotFound, HashMap::new(), None)
+            Self::send_response(&mut stream, ResponseType::NotFound, HashMap::new(), None)
         } else {
             let path = request_tokens[1];
             let token = &path[1..];
@@ -87,23 +90,48 @@ impl Server {
                     ResponseType::TemporaryRedirect
                 };
                 let headers = HashMap::from([("Location", link)]);
-                Self::send_response(stream, response_type, headers, Some(&content))
+                Self::send_response(&mut stream, response_type, headers, Some(&content))
             } else {
                 match path {
                     "/" | "/index.html" =>
-                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(INDEX_PAGE)),
+                        Self::send_response(&mut stream, ResponseType::Ok, HashMap::new(), Some(INDEX_PAGE)),
                     "/style.css" =>
-                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(STYLE_SHEET)),
+                        Self::send_response(&mut stream, ResponseType::Ok, HashMap::new(), Some(STYLE_SHEET)),
                     _ => {
                         let content = str::replace(NOT_FOUND_PAGE, "REDIRECTION_TOKEN", token);
-                        Self::send_response(stream, ResponseType::NotFound, HashMap::new(), Some(&content))
+                        Self::send_response(&mut stream, ResponseType::NotFound, HashMap::new(), Some(&content))
                     },
                 }
             }
         }
     }
 
-    fn send_response(mut stream: TcpStream, response_type: ResponseType,
+    fn read_line_limited(stream: &mut TcpStream, limit: usize) -> Result<String, Option<io::Error>> {
+        let mut accumulator = Vec::new();
+        let mut byte_buf = [0; 128];
+
+        while !accumulator.contains(&('\n' as u8)) && accumulator.len() < limit {
+            let bytes_read = stream.read(&mut byte_buf[..])?;
+            accumulator.extend_from_slice(&byte_buf[..bytes_read]);
+        }
+
+        let string = match String::from_utf8(accumulator) {
+            Ok(string) => string,
+            Err(_) => return Err(Self::send_response(stream, ResponseType::BadRequest, HashMap::new(), None).err()),
+        };
+        if string.contains("\r\n") {
+            let line = string.split("\r\n").next().unwrap().to_owned();
+            if line.contains('\r') || line.contains('\n') {
+                Self::send_response(stream, ResponseType::BadRequest, HashMap::new(), None)?;
+            }
+            Ok(line)
+        } else {
+            Self::send_response(stream, ResponseType::ReqURITooLong, HashMap::new(), None)?;
+            Err(None)
+        }
+    }
+
+    fn send_response(stream: &mut TcpStream, response_type: ResponseType,
                         headers: HashMap<&str, &str>, content: Option<&str>) -> io::Result<()> {
         use ResponseType::*;
 
@@ -112,6 +140,7 @@ impl Server {
             TemporaryRedirect => "307 TEMPORARY REDIRECT",
             PermanentRedirect => "307 PERMANENT REDIRECT",
             BadRequest => "400 BAD REQUEST",
+            ReqURITooLong => "414 REQUEST-URI TOO LONG",
             NotFound => "404 NOT FOUND",
         };
 
