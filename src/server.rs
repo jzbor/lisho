@@ -3,6 +3,7 @@ use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
+use std::time::Duration;
 
 use crate::store::Store;
 
@@ -50,21 +51,19 @@ impl Server {
             }
 
             if let Ok(stream) = stream {
+                stream.set_read_timeout(Some(Duration::from_millis(500)))
+                    .expect("Read timeout may not be zero");
                 let _ = self.handle_connection(stream);
             }
         }
     }
 
     fn handle_connection(&self, stream: TcpStream) -> io::Result<()> {
-        let mut lines = BufReader::new(&stream).lines();
-        let request_line = match lines.next() {
+        let reader = BufReader::new(&stream);
+        let request_line = match reader.lines().next() {
             Some(line) => line?,
             None => return Ok(()),
         };
-        let _headers: Vec<_> = lines
-            .flatten()
-            .take_while(|line| !line.is_empty())
-            .collect();
 
         let request_tokens: Vec<_> = request_line.split(' ').collect();
 
