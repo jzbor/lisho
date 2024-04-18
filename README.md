@@ -37,8 +37,8 @@ Similarly you can also set a favicon by redirecting it somewhere on the internet
 
 ```
 # override index page
- https://github.com/lisho
-index.html https://github.com/lisho
+ https://github.com/jzbor/lisho
+index.html https://github.com/jzbor/lisho
 
 # add favicon
 favicon.ico https://jzbor.de/favicon.ico
