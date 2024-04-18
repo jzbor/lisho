@@ -110,7 +110,7 @@ impl Server {
         let code_and_reason = match response_type {
             Ok => "200 OK",
             TemporaryRedirect => "307 TEMPORARY REDIRECT",
-            PermanentRedirect => "307 PERMANENT REDIRECT",
+            PermanentRedirect => "308 PERMANENT REDIRECT",
             BadRequest => "400 BAD REQUEST",
             NotFound => "404 NOT FOUND",
         };
