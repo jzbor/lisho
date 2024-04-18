@@ -91,9 +91,9 @@ impl Server {
             } else {
                 match path {
                     "/" | "/index.html" =>
-                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(INDEX_PAGE)),
+                        Self::send_response(stream, ResponseType::Ok, HashMap::from([("Content-Type", "text/html")]), Some(INDEX_PAGE)),
                     "/style.css" =>
-                        Self::send_response(stream, ResponseType::Ok, HashMap::new(), Some(STYLE_SHEET)),
+                        Self::send_response(stream, ResponseType::Ok, HashMap::from([("Content-Type", "text/css")]), Some(STYLE_SHEET)),
                     _ => {
                         let content = str::replace(NOT_FOUND_PAGE, "REDIRECTION_TOKEN", token);
                         Self::send_response(stream, ResponseType::NotFound, HashMap::new(), Some(&content))
