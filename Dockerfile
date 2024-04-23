@@ -1,4 +1,4 @@
-FROM rust:latest as builder
+FROM rust:slim as builder
 WORKDIR /usr/src/lisho
 COPY . .
 RUN cargo install --path .
